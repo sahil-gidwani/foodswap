@@ -8,6 +8,7 @@ It is a four-person Information Storage and Retrieval project built on [Open Foo
 
 1. [The data, the taxonomies and the code](explainers/01-data-and-code.md)
 2. [How we clean the data](explainers/02-data-cleaning.md)
+3. [The allergen check](explainers/03-allergen-check.md)
 
 **Status (2026-11-10):** planning complete. Every decision in [decisions.md](decisions.md) is *Proposed* until the team confirms it at kickoff. Start with [10-plan.md §3.4, "First 48 hours"](10-plan.md#34-first-48-hours).
 
