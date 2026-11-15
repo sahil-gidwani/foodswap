@@ -10,10 +10,11 @@ source .venv/bin/activate
 pip install -r requirements.txt
 python -m foodswap.data download
 python -m foodswap.data build
+python -m foodswap.search build
 python -m pytest
 ```
 
-`download` fetches about 8 GB into `data/` (git-ignored) and checks that the dump is complete. `build` turns it into `data/corpus/products.parquet` (the cleaned US products) and `sample.parquet` (18K products for quick development) in about 15 seconds.
+`download` fetches about 8 GB into `data/` (git-ignored) and checks that the dump is complete. `build` turns it into `data/corpus/products.parquet` (the cleaned US products) and `sample.parquet` (18K products for quick development) in about a minute, including the allergen verdicts. `foodswap.search build` builds the search indexes (about 18 minutes; add `--sample` for a one-minute build over the sample). Try it: `python -m foodswap.search query "crunchy oat cereal" --exclude peanuts`.
 
 ## Project
 
