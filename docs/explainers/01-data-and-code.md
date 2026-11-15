@@ -315,7 +315,7 @@ en:peanut {'en:peanuts'}
 
 ```
 food.parquet + taxonomies
-  └─ build (next): one clean row per US product, broken records dropped,
+  └─ build (done Nov 14: 349,308 products, 54 nutrients): one clean row per US product, broken records dropped,
                    duplicate sizes grouped, each product's comparison category decided
        ├─ evidence: PASS / FAIL / UNKNOWN for every product × allergen
        ├─ keyword index (BM25) and meaning index (embeddings)

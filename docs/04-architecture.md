@@ -201,7 +201,7 @@ Libraries were checked on PyPI on 2026-11-09; see [12-methods-survey.md](12-meth
 
 ```
 python -m foodswap.data download     # now: dump + taxonomies + completeness check
-python -m foodswap.data build        # next: the corpus (with --sample 20000 for the small one)
+python -m foodswap.data build        # now: the corpus and an 18K-product sample, about 15 seconds
 streamlit run app.py                 # later: the app
 ```
 

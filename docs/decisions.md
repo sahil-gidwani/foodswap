@@ -43,7 +43,7 @@ Each entry records the context, the decision and its consequences. Entries D-001
 - **Context.** OFF lists about 1.0M products for the US. A sample showed non-English records under the US filter, vandalized records and free-text tags.
 - **Decision.** The searchable corpus contains products sold in the US with an English name, a canonical category and passing sanity checks. Records are flagged and excluded, never repaired. The proposal's 4×100 set becomes a committed test fixture.
 - **Consequences.** A corpus of several hundred thousand products *(to be measured)*. The audit reports every exclusion.
-- **Docs:** [03 §4](03-data-pipeline.md#4-quality-flags-and-the-searchable-gate).
+- **Docs:** [03 §4](03-data-pipeline.md#4-quality-checks-and-the-funnel).
 
 ### D-003 · `bm25s` replaces `rank-bm25`
 

@@ -1,18 +1,18 @@
 # 03 · Data pipeline and storage
 
-**Use:** design (frozen after the schema freeze on Tue Nov 10, except through [decisions.md](decisions.md)).
+**Use:** design, implemented in `foodswap/data.py` (`python -m foodswap.data build`, about 15 seconds). Changes go through [decisions.md](decisions.md).
 **Read by:** DATA role (owner); RANK and QUX for the schema in section 2.
-**Last updated:** 2026-11-10.
+**Last updated:** 2026-11-14 (first build).
 
 This document specifies how the Open Food Facts dump becomes the corpus the search engine runs on. Sources are described in [02-data-sources.md](02-data-sources.md).
 
 ## 1. Principles
 
-1. **Sample first.** A 20K-product sample corpus exists on Tue Nov 10, before any cleaning is finished, so the other three roles are never blocked on data.
-2. **Flag and exclude, never repair.** A record that fails a check gets a flag and is kept out of the searchable set. We do not guess a corrected value. Repair is unbounded work and quietly changes the data we report on.
+1. **Sample alongside.** Every build also writes an 18K-product sample, so development never waits on the full corpus.
+2. **Exclude, never repair.** A record that fails a check is left out of the corpus and counted. We do not guess a corrected value. Repair is unbounded work and quietly changes the data we report on.
 3. **Every exclusion is counted.** The pipeline emits a funnel (rows in, rows out, per gate). The funnel is a deliverable, not a log line.
 4. **One row index.** After the corpus is frozen, the row position `idx` is the document id in every index and array. The barcode `code` is the external id used in run files and labels.
-5. **One command, one snapshot.** `python -m foodswap.data build` goes from the raw Parquet to the corpus, and every artifact records the manifest hash it was built from.
+5. **One command, one snapshot.** `python -m foodswap.data build` goes from the raw Parquet to the corpus, and `build.json` records the SHA-256 of the dump it was built from.
 
 ## 2. Canonical schema
 
@@ -22,44 +22,44 @@ This document specifies how the Open Food Facts dump becomes the corpus the sear
 
 | Column | Type | Derived from | Notes |
 |---|---|---|---|
-| `idx` | int32 | row position | Document id in all indexes |
+| (row position) | | | The document id in all indexes; not stored as a column |
 | `code` | string | `code` | Barcode as stored by OFF, digits only |
-| `name` | string | `product_name` entry with `lang = 'en'` | Required by the searchable gate |
-| `generic_name` | string, nullable | `generic_name`, `en` | |
-| `brand` | string, nullable | `brands` | First brand, trimmed; original kept in `brands_raw` |
-| `ingredients_text` | string, nullable | `ingredients_text`, `en` | Lower-cased copy in `ingredients_text_norm` |
-| `lang` | string | `lang` | Kept for the audit; not trusted on its own |
+| `name` | string | `product_name`: the `en` entry, else the main-language entry | Required |
+| `generic_name` | string, nullable | `generic_name`, same rule | |
+| `brand` | string, nullable | `brands` | First brand, trimmed. Missing for 36% of products. |
+| `ingredients_text` | string, nullable | `ingredients_text`, same rule | Present for 88% of products |
 
 ### 2.2 Tags
 
 | Column | Type | Derived from | Notes |
 |---|---|---|---|
-| `categories` | list<string> | `categories_tags` | Only ids that exist in the category taxonomy; free-text entries dropped and counted |
-| `category_leaf` | string, nullable | computed | Deepest canonical category on the product |
-| `comparison_category` | string, nullable | computed | See section 5.2 |
+| `categories` | list<string> | `categories_tags` | Only ids that exist in the category taxonomy; at least one required |
+| `category` | string | computed | Deepest category on the product |
+| `comparison_category` | string | computed | See section 5.2 |
 | `ingredient_tags` | list<string> | `ingredients_tags` | Canonical ids only |
 | `ingredients_n`, `unknown_ingredients_n` | int32 | same-named columns | Inputs to the evidence-sufficiency rule |
-| `allergen_tags`, `trace_tags` | list<string> | `allergens_tags`, `traces_tags` | Canonical ids only; non-canonical entries such as `en:Corn` dropped and counted |
+| `allergen_tags`, `trace_tags` | list<string> | `allergens_tags`, `traces_tags` | Canonical ids only; non-canonical entries such as `en:Corn` are dropped |
 | `label_tags` | list<string> | `labels_tags` | Canonical ids only |
 | `analysis_tags` | list<string> | `ingredients_analysis_tags` | Vegan / vegetarian / palm-oil status (used by S7) |
 
 ### 2.3 Nutrition
 
-All values are per 100 g or per 100 ml, as given by the `100g` member of each `nutriments` struct.
+Every nutrient in the dump becomes a column: 54 of them, from `energy_kcal`, `fat`, `sugars`, `proteins` and `sodium` to cholesterol, trans fat, vitamins, minerals and individual sugars. Dashes become underscores (`saturated-fat` → `saturated_fat`). Values are per 100 g, or per 100 ml for drinks, taken from the `100g` member of each `nutriments` entry. Masses are in grams, so sodium 0.487 means 487 mg.
 
-| Column | Type | Nutrient name in `nutriments` | Unit |
-|---|---|---|---|
-| `energy_kcal` | float32 | `energy-kcal` | kcal |
-| `sugars` | float32 | `sugars` | g |
-| `added_sugars` | float32 | `added-sugars` | g |
-| `proteins` | float32 | `proteins` | g |
-| `fat` | float32 | `fat` | g |
-| `saturated_fat` | float32 | `saturated-fat` | g |
-| `carbohydrates` | float32 | `carbohydrates` | g |
-| `fiber` | float32 | `fiber` | g |
-| `sodium` | float32 | `sodium` | **g** (OFF stores grams; display converts to mg) |
-| `salt` | float32 | `salt` | g |
-| `basis` | string | computed | `g` or `ml`. Two products are only ever compared on the same basis. |
+Three kinds of entries are left out:
+
+- scores and estimates that are not nutrients (Nutri-Score points, NOVA group, fruit and vegetable estimates);
+- duplicates: energy in kJ, and `salt`, which is always sodium × 2.5;
+- names used by fewer than 1% of products, which are mostly one-off typos such as `es-l-glutamine`.
+
+The list is discovered from the data on each build and saved in `build.json`.
+
+The eight **headline nutrients** are energy, fat, saturated fat, carbohydrates, sugars, fiber, protein and sodium. They are the numbers every label carries, used for the plausibility check (section 4) and for recognizing pack sizes (section 5.1).
+
+| Column | Type | Notes |
+|---|---|---|
+| one column per nutrient | float | missing values are `NaN` |
+| `basis` | string | `g` or `ml`. Two products are only ever compared on the same basis. |
 
 Missing values are `NaN`, never zero. A blank on a label is not a zero.
 
@@ -68,53 +68,31 @@ Missing values are `NaN`, never zero. A blank on a label is not a zero.
 | Column | Type | Derived from | Notes |
 |---|---|---|---|
 | `nutriscore_grade` | string, nullable | `nutriscore_grade` | `a`–`e`; other values become null. Computed by OFF. Used by baseline X2 and shown in the UI. |
-| `nutriscore_score` | int32, nullable | `nutriscore_score` | |
-| `nova_group` | int8, nullable | `nova_group` | Shown in the UI only |
-| `unique_scans_n` | int32 | `unique_scans_n` | Popularity; a tie-breaker and the family representative rule |
-| `completeness` | float32 | `completeness` | |
-| `quality_flags` | list<string> | computed | Section 4 |
-| `searchable` | bool | computed | Section 4 |
-| `family_id` | int32 | computed | Section 5.1 |
-| `last_modified_t` | int64 | `last_modified_t` | Shown as "record last edited" |
+| `nova_group` | int, nullable | `nova_group` | Shown in the UI only |
+| `scans` | int | `unique_scans_n` (0 if missing) | Popularity; a tie-breaker |
+| `last_modified_t` | int | `last_modified_t` | Shown as "record last edited" |
+| `family_id` | int | computed | Section 5.1 |
 
-Companion files in the same directory:
+Other files in `data/corpus/`:
 
-- `families.parquet`: `family_id`, member `idx` list, representative `idx`.
-- `nutrients.npy`: a float32 matrix (rows × the ten nutrient columns) for vectorized scoring.
-- `evidence.parquet`: built by the constraints module, specified in [07](07-constraints-and-safety.md#4-storage).
-- `category_postings.npz`: for each category id, the sorted `idx` array of products at or below it.
+- `sample.parquet`: the same columns for 18,293 products (section 3).
+- `build.json`: the funnel (section 4), counts, and the SHA-256 of the dump it came from.
+- Added by later steps: `evidence.parquet` ([07](07-constraints-and-safety.md#4-storage)) and the nutrient percentiles (section 5.3).
 
 ## 3. Extraction
 
-Two passes with DuckDB, so the expensive scan over 4.9M rows happens once.
-
-**Pass 1: the US subset.** Keep rows whose `countries_tags` contains `en:united-states` and that are not obsolete. Write `data/interim/us.parquet` (about 1.0M rows).
-
-**Pass 2: the canonical projection.** Select the English entry of each multilingual field, pivot the nutrient list into columns, and keep only canonical tags.
-
-The queries below are illustrative. DuckDB 2.0 rejects the old `x -> …` lambda syntax, so use `lambda x: …`; `name` and `text` are reserved words and need double quotes (checked on the 2026-11-14 snapshot).
+One DuckDB query reads the US rows that are not obsolete and flattens them: the English entry of each multilingual field, one column per nutrient, plain tag lists. Two small SQL macros do the flattening (DuckDB 2.0 needs `lambda x: …`, and `"name"` and `"text"` are reserved words):
 
 ```sql
--- Pass 1
-COPY (
-  SELECT *
-  FROM read_parquet('data/raw/food.parquet')
-  WHERE list_contains(countries_tags, 'en:united-states')
-) TO 'data/interim/us.parquet' (FORMAT parquet, COMPRESSION zstd);
-
--- Pass 2 (excerpt)
-SELECT
-  code,
-  list_filter(product_name,     lambda x: x.lang = 'en')[1]."text" AS name,
-  list_filter(ingredients_text, lambda x: x.lang = 'en')[1]."text" AS ingredients_text,
-  list_filter(nutriments, lambda x: x."name" = 'sugars')[1]."100g"   AS sugars,
-  list_filter(nutriments, lambda x: x."name" = 'proteins')[1]."100g" AS proteins,
-  categories_tags, allergens_tags, traces_tags, ingredients_tags,
-  ingredients_n, unknown_ingredients_n, nutriscore_grade, unique_scans_n
-FROM read_parquet('data/interim/us.parquet');
+CREATE MACRO english(texts) AS coalesce(
+    list_filter(texts, lambda x: x.lang = 'en'   AND trim(x."text") <> '')[1]."text",
+    list_filter(texts, lambda x: x.lang = 'main' AND trim(x."text") <> '')[1]."text");
+CREATE MACRO nutrient(values, n) AS list_filter(values, lambda x: x."name" = n)[1]."100g";
 ```
 
-`python -m foodswap.data build --sample 20000` produces the sample corpus: the 5,000 most-scanned products in each of the four proposal categories (breakfast cereals, yogurts, snacks, beverages). It uses the same code path as the full build.
+The rest of the cleaning runs in pandas on the roughly 370K rows that have an English name and at least one category tag.
+
+The build also writes `sample.parquet`: the 5,000 most-scanned products in each of the four proposal categories (breakfast cereals, yogurts, snacks, beverages), 18,293 in total because cereals have fewer than 5,000 and some products sit in two categories. The sample keeps the full corpus's family ids and comparison categories.
 
 **Basis.** Checked on the 2026-11-14 snapshot (US rows): neither field is reliable.
 
@@ -123,27 +101,36 @@ FROM read_parquet('data/interim/us.parquet');
 
 So the fallback rule applies: products under `en:beverages` are `ml`, everything else `g`, unless `product_quantity_unit` says otherwise. The rule is stated in the report.
 
-## 4. Quality flags and the searchable gate
+## 4. Quality checks and the funnel
 
-Each check adds a flag. A product is `searchable` only if it has none of the blocking flags.
+Checks run in this order. Counts are from the build on the 2026-11-14 snapshot:
 
-| Flag | Check | Blocking |
+| Step | Rule | Products left |
 |---|---|---|
-| `no_english_name` | No `en` entry in `product_name`, or the name is empty | yes |
-| `no_category` | No canonical category after dropping free-text entries | yes |
-| `obsolete` | Marked obsolete by OFF | yes |
-| `nutrient_out_of_range` | Any per-100 value below 0; any gram value above 100; energy above 900 kcal | yes |
-| `macros_exceed_100` | fat + carbohydrates + proteins above 105 g per 100 g | yes |
-| `energy_mismatch` | Stated energy differs from 4·carbohydrates + 4·proteins + 9·fat by more than 30% and more than 50 kcal | yes |
-| `off_quality_error` | Any entry in `data_quality_errors_tags` | yes |
-| `mostly_unknown_ingredients` | OFF warning `en:ingredients-90-percent-unknown` | no (the evidence rule handles it) |
-| `no_english_ingredients` | No `en` entry in `ingredients_text` | no (searchable, but every allergen verdict will be unknown) |
-| `no_nutrition` | All ten nutrient columns missing | no (searchable, but cannot satisfy a numeric limit or earn nutrient improvement) |
-| `noncanonical_tags_dropped` | At least one tag was dropped | no |
+| US products | `countries_tags` contains `en:united-states`, not obsolete | 1,002,000 |
+| English | Main language is English and there is an English (or main-language) name | 960,992 |
+| Has a category | At least one category the taxonomy knows; free-text categories are dropped | 367,436 |
+| No OFF quality errors | `data_quality_errors_tags` is empty. These are OFF's own checks: energy not matching the macronutrients, totals over 105 g per 100 g, energy over 3,800 kJ | 349,527 |
+| Plausible nutrition | No headline nutrient below 0 or above 105 g (labels round, so corn syrup can show 103 g of carbohydrate), and energy at most 900 kcal per 100 g. An impossible value in any other nutrient (184 products had impossible water values) blanks that value instead of dropping the product. | **349,308** |
 
-Two points about the non-blocking flags. A product without English ingredients stays in the corpus because it can still be a valid answer to a request with no exclusions, and because rejecting it for an exclusion is a result we want to count ("unknown-rejection rate"), not hide. The thresholds in the table are starting values; they are tuned once against the sample and then logged in [decisions.md](decisions.md).
+What the numbers show:
 
-Acceptance for T2.3: the vandalized Cheerios record (`0016000275287`) and the Italian-language product (`20621483`) are both outside the searchable set, and the funnel counts are written to `reports/data_funnel.json`.
+- **Category is the expensive requirement:** it removes 62% of English-named US products. It stays, because without a category there is no way to decide what "the same kind of product" means. Category imputation (Robotoff predictions or our own classifier) is future work (F-D14).
+- **The language check catches more than language.** It removes the vandalized Cheerios record (`0016000275287`, main language set to Latin) and the Italian bran flakes (`20621483`).
+- **Incomplete products stay.** A product without English ingredients or without some nutrients is kept: it can still answer a request with no exclusions, and rejecting it for an exclusion is a result we count (the unknown-rejection rate), not hide.
+
+Nutrient coverage in the corpus:
+
+| Nutrient | Present |
+|---|---|
+| Energy, protein, fat | 95% |
+| Sodium | 93% |
+| Sugars | 92% |
+| Saturated fat | 87% |
+| Fiber | 80% |
+| Added sugars | **20%** |
+
+Requests about "added sugar" will therefore often meet "not reported".
 
 ## 5. Enrichment
 
@@ -151,12 +138,12 @@ Acceptance for T2.3: the vandalized Cheerios record (`0016000275287`) and the It
 
 A family is one product sold under several barcodes, typically different pack sizes. Without families, the top five fills with sizes of the same thing.
 
-**Key (exact match):** normalized brand + normalized name + nutrient signature.
+**Key (exact match):** normalized brand + normalized name + nutrient signature. **Unbranded products are never grouped.** Without a brand, "Extra Virgin Olive Oil" with olive oil's nutrition matched 72 different products in the first build.
 
 - Normalized brand and name: lower-case, strip punctuation, collapse whitespace, remove size tokens ("18 oz", "510 g", "family size").
-- Nutrient signature: the ten nutrient values rounded to one decimal place, with missing values encoded as such.
+- Nutrient signature: the eight headline nutrients rounded to one decimal place, with missing values encoded as such. Vitamins are left out, because two people entering the same product often record different ones.
 
-The representative of a family is the member with the most scans, ties broken by completeness. Search results show one member per family and note how many other sizes exist.
+Result: 349,308 products form 337,242 families. Most families are single products; 9,867 have two members, and the largest are one brand's seltzer water or Diet Pepsi in many sizes (10–21 barcodes). Search results show one member per family and note how many other sizes exist.
 
 Acceptance for T2.5: the two Cheerios records `0016000275263` and `0016000170032` share a family, and a reference product's own family is never returned as a substitute.
 
@@ -164,9 +151,11 @@ Fuzzy matching (edit distance, MinHash over ingredients) would merge more, and w
 
 ### 5.2 Comparison category
 
-The comparison category answers "which products are the same kind of thing as the reference". It is the deepest canonical category on the reference product that contains at least `min_category_size` searchable families (default 30), found by walking up the taxonomy from `category_leaf`.
+The comparison category answers "which products are the same kind of thing as the reference". It is the most specific of the product's own categories that holds at least 30 families. Category depth is the longest path to the top of the taxonomy, since a category can have several parents. If none of a product's categories is that big, the one with the most families is used.
 
 Example: a granola tagged `en:breakfast-cereals` → `en:mueslis` uses `en:mueslis` if that category has 30 or more families, and otherwise backs off to `en:breakfast-cereals`.
+
+Coarse tagging limits this: 30,759 products are tagged only `en:snacks`, so plain "snacks" is their comparison category. A precisely tagged reference never compares against them, because they are not in its category.
 
 A type term in the request overrides this: "a similar cereal" on a granola reference widens the scope to the category whose name matches "cereal". The override logic lives in query formulation ([05](05-query-understanding.md#6-query-formulation)).
 
@@ -179,16 +168,14 @@ For each nutrient and each category with enough products, store the empirical di
 ```
 data/                  (git-ignored)
   raw/                 food.parquet, taxonomies/*.json, REVISION, MANIFEST.json   (never edited)
-  interim/             us.parquet                                                 (rebuildable)
-  corpus/              products.parquet, families.parquet, evidence.parquet,
-                       nutrients.npy, category_postings.npz
-  index/               bm25_name/, bm25_categories/, bm25_ingredients/, dense/vectors.f16.npy
-  runs/                one folder per system run
+  corpus/              products.parquet, sample.parquet, build.json; later evidence.parquet
+  index/               BM25 and dense indexes (later)
+  runs/                one folder per system run (later)
 eval/                  scenarios/, b3_cache/, pools/, labels/, qrels/                (tracked)
-reports/               data_funnel.json, data_audit.md, figures/                     (generated)
+reports/               data_audit.md, figures/                                       (generated)
 ```
 
-A rebuilt corpus records the manifest's SHA-256 it came from, so builds from the same snapshot are interchangeable and anything else is visibly different.
+`build.json` records the dump's SHA-256, so builds from the same snapshot are interchangeable and anything else is visibly different.
 
 `MANIFEST.json` records the Hugging Face revision, the file's SHA-256, the total and US row counts, and the date it was checked.
 

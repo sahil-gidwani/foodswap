@@ -70,7 +70,7 @@ Nutrient lexicon:
 | protein | `proteins` |
 | fat, fats | `fat` |
 | saturated fat, sat fat, saturates | `saturated_fat` |
-| salt | `salt` |
+| salt | `sodium` (salt ÷ 2.5) |
 | sodium | `sodium` |
 | fiber, fibre | `fiber` |
 | calories, calorie, kcal, energy | `energy_kcal` |

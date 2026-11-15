@@ -114,11 +114,11 @@ It has about one day of float, and the human labeling sits on it. Parser tests, 
 |---|---|---|---|---|---|
 | T1.1 | Project skeleton: package, pinned requirements, data download | 3 | RANK | – | `pip install -r requirements.txt` works on all four laptops. **Done Nov 14.** |
 | T1.2 | Kickoff: deadline email, capacity, roles, decisions confirmed | 2 | all | – | Roles and deadline recorded here; decisions marked accepted |
-| T2.1 | Download Parquet and four taxonomies; manifest | 2 | DATA | – | ≥ 4.8M rows, ≥ 0.95M US rows, checksum and revision recorded |
-| T2.2 | DuckDB extraction to the canonical schema, `--sample` flag | 6 | DATA | T2.1 | One command; the 20K sample exists Tue Nov 10 |
-| T2.3 | Quality flags and the searchable gate | 3 | DATA | T2.2 | The vandalized Cheerios and the Italian-language record are excluded; funnel written |
-| T2.4 | Taxonomy module, ancestor closure, comparison category, category postings | 4 | DATA | T2.1 | Comparison category computed for every searchable product |
-| T2.5 | Product families by exact key | 2 | DATA | T2.2 | The two Cheerios barcodes share a family; a reference's family is never returned |
+| T2.1 | Download Parquet and four taxonomies; manifest | 2 | DATA | – | ≥ 4.8M rows, ≥ 0.95M US rows, checksum and revision recorded. **Done Nov 14.** |
+| T2.2 | DuckDB extraction to the canonical schema, plus a sample | 6 | DATA | T2.1 | One command writes the corpus and the sample. **Done Nov 14** (349,308 products, 54 nutrients; 18,293 in the sample). |
+| T2.3 | Quality flags and the searchable gate | 3 | DATA | T2.2 | The vandalized Cheerios and the Italian-language record are excluded; funnel written. **Done Nov 14.** |
+| T2.4 | Taxonomy module, ancestor closure, comparison category, category postings | 4 | DATA | T2.1 | Comparison category computed for every searchable product. **Comparison category done Nov 14**; ancestor closure for ingredients comes with the evidence step. |
+| T2.5 | Product families by exact key | 2 | DATA | T2.2 | The two Cheerios barcodes share a family; a reference's family is never returned. **Families done Nov 14.** |
 | T2.6 | Missingness and coverage audit | 2 | DATA | T2.3 | `reports/data_audit.md` and the funnel figure come from a script |
 | T3.1 | Constraint vocabulary | 2 | EVAL | – | The vocabulary covers the 11 items in [07](07-constraints-and-safety.md#2-vocabulary), with exceptions |
 | T3.2 | Evidence builder and golden tests | 7 | QUX | T2.2, T2.4, T3.1 | Nutella fails milk and soy; missing ingredients give UNKNOWN; every verdict names its source; all exception tests pass |
