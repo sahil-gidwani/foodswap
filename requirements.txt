@@ -7,3 +7,4 @@ bm25s==0.3.16
 PyStemmer==3.1.0
 sentence-transformers==6.3.0
 streamlit==1.67.0
+pytest==9.2.0

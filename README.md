@@ -10,6 +10,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 python -m foodswap.data download
 python -m foodswap.data build
+python -m pytest
 ```
 
 `download` fetches about 8 GB into `data/` (git-ignored) and checks that the dump is complete. `build` turns it into `data/corpus/products.parquet` (the cleaned US products) and `sample.parquet` (18K products for quick development) in about 15 seconds.

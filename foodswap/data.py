@@ -16,6 +16,8 @@ import duckdb
 import numpy as np
 import pandas as pd
 
+from foodswap import allergens
+
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 RAW_DIR = DATA_DIR / "raw"
 PARQUET = RAW_DIR / "food.parquet"
@@ -170,13 +172,14 @@ def build():
     depth = category_depths(categories)
     df["category"] = df.categories.map(lambda tags: max(tags, key=lambda t: (depth.get(t, 0), t)))
     df["comparison_category"] = comparison_categories(df, depth)
+    allergen_columns = allergens.add_verdicts(df, load_taxonomy("ingredients"))
 
     columns = [
         "code", "name", "brand", "generic_name", "ingredients_text",
         "category", "comparison_category", "categories",
         "ingredient_tags", "allergen_tags", "trace_tags", "label_tags", "analysis_tags",
         "ingredients_n", "unknown_ingredients_n", *nutrients, "basis",
-        "nutriscore_grade", "nova_group", "scans", "last_modified_t", "family_id",
+        "nutriscore_grade", "nova_group", "scans", "last_modified_t", "family_id", *allergen_columns,
     ]
     CORPUS_DIR.mkdir(parents=True, exist_ok=True)
     df[columns].to_parquet(CORPUS_DIR / "products.parquet", index=False)
@@ -192,6 +195,10 @@ def build():
         "funnel": funnel,
         "products": len(df),
         "families": int(df.family_id.nunique()),
+        "allergen_verdicts": {
+            name: {v.name.lower(): int((df[f"allergen_{name}"] == v).sum()) for v in allergens.Verdict}
+            for name in allergens.ALLERGENS
+        },
         "nutrients": nutrients,
         "with_english_ingredients": int(df.ingredients_text.notna().sum()),
         "sample_products": len(sample),
