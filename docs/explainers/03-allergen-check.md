@@ -118,6 +118,13 @@ If no source mentions the allergen, `ingredients_problem()` checks whether the i
 
 **Evidence beats missing information.** A product with no ingredient list but "peanuts" in its allergen list is FAIL, not UNKNOWN.
 
+**The name is a last check.** Building search exposed products whose ingredient list was cut off part-way:
+
+- Reese's Miniature Cups are recorded as just "milk chocolate [sugar": two ingredients, both recognized, so they passed.
+- Hershey's Peanut Butter Blossoms' list stops before the peanut part.
+
+So when the list looks fine but the product's name mentions the allergen, the verdict is UNKNOWN with the reason "name". It isn't FAIL, because names also mention allergens that aren't there: "Cape Cod" chips, "Circus Peanuts" candy, chocolate "peanut butter eggs". Either way the product is excluded. This moved 120 products from PASS to UNKNOWN for peanuts, and between 0.1% and 1% of passing products for the other allergens.
+
 ### 4.4 Deliberately conservative choices
 
 Each of these can wrongly exclude a product, but none can wrongly include one:
@@ -135,7 +142,7 @@ Each of these can wrongly exclude a product, but none can wrongly include one:
 |---|---|
 | `ingredients_check` | `ok`, or which problem applies |
 | `allergen_peanuts`, `allergen_milk`, … | 0 FAIL, 1 PASS, 2 UNKNOWN |
-| `allergen_peanuts_sources`, … | For a FAIL, which sources fired, such as `allergen list+ingredient+ingredient text` |
+| `allergen_peanuts_sources`, … | For a FAIL, which sources fired, such as `allergen list+ingredient+ingredient text`; `name` for an UNKNOWN caused by the name |
 
 The detailed evidence (which tag, which ingredient, which word) isn't stored. `check()` recomputes it for the few products shown on screen, so the stored verdict and the displayed explanation can never disagree.
 
@@ -160,25 +167,27 @@ All are fixed.
 
 **3. Hunting for false alarms.** We looked at what triggered every fail that rested on the ingredient text alone. That found almond, cashew and sunflower butter failing milk, and soy nuts and corn nuts failing tree nuts. All are fixed. About 750 dairy-free products now correctly pass milk.
 
-**4. Tests.** 36 tests in `tests/test_allergens.py` lock in every rule and lookalike. They use a tiny hand-made taxonomy, so they run in under a second without the data.
+**5. Using it in search.** Searching "peanut butter cereal" with peanuts excluded first returned Reese's cups and Peanut Butter Blossoms. That is how the cut-off lists were found, and why the name check exists.
+
+**4. Tests.** 38 tests in `tests/test_allergens.py` lock in every rule and lookalike. They use a tiny hand-made taxonomy, so they run in under a second without the data.
 
 ## 7. Results
 
 | Allergen | FAIL | PASS | UNKNOWN |
 |---|---|---|---|
-| milk | 102,537 | 154,646 | 92,125 (26%) |
-| eggs | 31,430 | 216,596 | 101,282 (29%) |
-| fish | 6,129 | 241,143 | 102,036 (29%) |
-| crustaceans | 2,985 | 243,463 | 102,860 (29%) |
-| molluscs | 1,055 | 244,804 | 103,449 (30%) |
-| tree nuts | 25,823 | 223,524 | 99,961 (29%) |
-| peanuts | 16,286 | 231,283 | 101,739 (29%) |
-| wheat | 76,100 | 175,238 | 97,970 (28%) |
-| gluten | 77,150 | 174,440 | 97,718 (28%) |
-| soybeans | 88,715 | 163,931 | 96,662 (28%) |
-| sesame | 9,138 | 237,598 | 102,572 (29%) |
+| milk | 102,537 | 153,077 | 93,694 (27%) |
+| eggs | 31,430 | 216,112 | 101,766 (29%) |
+| fish | 6,129 | 240,773 | 102,406 (29%) |
+| crustaceans | 2,985 | 243,356 | 102,967 (29%) |
+| molluscs | 1,055 | 244,721 | 103,532 (30%) |
+| tree nuts | 25,823 | 222,870 | 100,615 (29%) |
+| peanuts | 16,286 | 231,163 | 101,859 (29%) |
+| wheat | 76,100 | 175,169 | 98,039 (28%) |
+| gluten | 77,150 | 174,341 | 97,817 (28%) |
+| soybeans | 88,715 | 163,908 | 96,685 (28%) |
+| sesame | 9,138 | 237,591 | 102,579 (29%) |
 
-Roughly 26–30% of products can't be verified for any given allergen. That is the price of never treating missing data as safe, and the report will show it.
+Roughly 27–30% of products can't be verified for any given allergen. That is the price of never treating missing data as safe, and the report will show it.
 
 ## 8. What it can't catch
 

@@ -64,6 +64,8 @@ Four sources can show an allergen. The names below are what the code records as 
 | `ingredient` | an entry in `ingredient_tags` carries the allergen, directly or inherited through the ingredient taxonomy. Only 76 ingredient nodes declare an allergen; 1,382 ingredients inherit one, for example whey → dairy → milk. |
 | `ingredient text` | the English ingredient text matches the words, after exceptions and free-from claims are removed |
 
+**The product name.** When the name mentions the allergen but none of the four sources does, the record contradicts itself, usually because the ingredient list was cut off part-way. Reese's Miniature Cups are recorded as just "milk chocolate [sugar", and Hershey's Peanut Butter Blossoms' list stops before the peanut part. Such products get UNKNOWN, not PASS, with the reason `name`. They don't get FAIL, because names also mention allergens that aren't there: "Cape Cod" chips, "Circus Peanuts" candy, chocolate "peanut butter eggs". The same word lists, exceptions and free-from handling apply to the name. This affects 0.1–1% of otherwise passing products, depending on the allergen.
+
 Free-from labels (`en:no-gluten` and similar) are not used as evidence. They never turn a positive source into a PASS, and they never stand in for a missing ingredient list.
 
 The rule, in order:
@@ -82,6 +84,7 @@ The rule, in order:
 | `no_ingredients` | no English ingredient text | "Cannot verify: no English ingredient list" |
 | `not_parsed` | `ingredients_n` missing or 0 | "Cannot verify: ingredient list not parsed" |
 | `low_recognition` | recognized share below θ | "Cannot verify: {k} of {n} ingredients not recognized" |
+| `name` | the ingredient list looks fine, but the product's name mentions the allergen | "Cannot verify: the name mentions peanut but the ingredient list doesn't" |
 
 Rules about conflicting sources:
 
@@ -115,7 +118,7 @@ The verdicts are columns of `data/corpus/products.parquet` (and the sample), add
 |---|---|
 | `ingredients_check` | `ok`, or why the ingredient list can't support a PASS: `no_ingredients`, `not_parsed`, `low_recognition` |
 | `allergen_<name>` | 0 FAIL, 1 PASS, 2 UNKNOWN, one column per allergen (`allergen_peanuts`, …) |
-| `allergen_<name>_sources` | for a FAIL, which sources fired, joined by `+` (e.g. `allergen list+ingredient+ingredient text`) |
+| `allergen_<name>_sources` | for a FAIL, which sources fired, joined by `+` (e.g. `allergen list+ingredient+ingredient text`); `name` for an UNKNOWN caused by the name |
 
 The detailed evidence (which tag, which ingredient, which words) is recomputed by `allergens.check()` at display time, only for the products on screen.
 
@@ -123,19 +126,19 @@ Results on the 2026-11-14 snapshot, 349,308 products:
 
 | Allergen | FAIL | PASS | UNKNOWN |
 |---|---|---|---|
-| milk | 102,537 | 154,646 | 92,125 (26%) |
-| eggs | 31,430 | 216,596 | 101,282 (29%) |
-| fish | 6,129 | 241,143 | 102,036 (29%) |
-| crustaceans | 2,985 | 243,463 | 102,860 (29%) |
-| molluscs | 1,055 | 244,804 | 103,449 (30%) |
-| tree_nuts | 25,823 | 223,524 | 99,961 (29%) |
-| peanuts | 16,286 | 231,283 | 101,739 (29%) |
-| wheat | 76,100 | 175,238 | 97,970 (28%) |
-| gluten | 77,150 | 174,440 | 97,718 (28%) |
-| soybeans | 88,715 | 163,931 | 96,662 (28%) |
-| sesame | 9,138 | 237,598 | 102,572 (29%) |
+| milk | 102,537 | 153,077 | 93,694 (27%) |
+| eggs | 31,430 | 216,112 | 101,766 (29%) |
+| fish | 6,129 | 240,773 | 102,406 (29%) |
+| crustaceans | 2,985 | 243,356 | 102,967 (29%) |
+| molluscs | 1,055 | 244,721 | 103,532 (30%) |
+| tree_nuts | 25,823 | 222,870 | 100,615 (29%) |
+| peanuts | 16,286 | 231,163 | 101,859 (29%) |
+| wheat | 76,100 | 175,169 | 98,039 (28%) |
+| gluten | 77,150 | 174,341 | 97,817 (28%) |
+| soybeans | 88,715 | 163,908 | 96,685 (28%) |
+| sesame | 9,138 | 237,591 | 102,579 (29%) |
 
-Roughly 26–30% of products can't be verified for any given allergen. Mostly they have no English ingredient list, or Open Food Facts recognized less than 80% of the ingredients. That is the coverage cost of the conservative rule (section 6).
+Roughly 27–30% of products can't be verified for any given allergen. Mostly they have no English ingredient list, or Open Food Facts recognized less than 80% of the ingredients. That is the coverage cost of the conservative rule (section 6).
 
 Ingredient exclusions outside the vocabulary are evaluated at query time, from `ingredient_tags` and the ingredient text.
 
@@ -176,6 +179,7 @@ The default policy is never relaxed silently.
 - that each source alone is enough to FAIL;
 - that a clean record passes;
 - that each kind of missing information gives UNKNOWN, never PASS, while positive evidence still gives FAIL;
+- that a name mentioning the allergen turns an otherwise clean record into UNKNOWN, while a "peanut-free" name doesn't;
 - that a gluten tag counts as possible wheat;
 - lookalikes that must not match: plant milks and butters, eggplant, coconut, nutmeg, doughnut, water chestnut, soy nuts, buckwheat, rice and mustard flour, "gluten free flour blend", maltodextrin, free-from claims, shellfish versus fish;
 - real mentions that must match: "milkpowder", "butterfat", "lactalbumin", "lysozyme", "whitefish roe", "pistachionut", "peanutbutter", "soybeanoil", "sesameoil", "flour, sugar", "enriched bleached flour", malt vinegar.

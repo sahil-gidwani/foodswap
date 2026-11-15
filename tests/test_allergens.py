@@ -18,8 +18,9 @@ TAXONOMY = {
 CARRIED = ingredient_allergens(TAXONOMY)
 
 
-def product(text="sugar, oats", tags=(), traces=(), ingredients=("en:sugar",), n=2, unknown=0):
+def product(text="sugar, oats", tags=(), traces=(), ingredients=("en:sugar",), n=2, unknown=0, name="Oat cereal"):
     return {
+        "name": name,
         "ingredients_text": text,
         "allergen_tags": list(tags),
         "trace_tags": list(traces),
@@ -73,6 +74,16 @@ def test_missing_information_is_unknown_not_pass(p, reason):
 
 def test_evidence_beats_missing_information():
     assert verdict(product(text=None, tags=["en:peanuts"]), "peanuts") == Verdict.FAIL
+
+
+def test_name_mentioning_the_allergen_makes_a_clean_record_unknown():
+    # A list cut off before the peanut part, like Reese's cups recorded as "milk chocolate [sugar".
+    cut_off = product(text="milk chocolate [sugar", name="Reese's Peanut Butter Cups")
+    assert check(cut_off, "peanuts", CARRIED) == (Verdict.UNKNOWN, [("name", "peanut")])
+
+
+def test_name_free_from_claim_does_not_count():
+    assert verdict(product(name="Peanut-Free Granola"), "peanuts") == Verdict.PASS
 
 
 def test_gluten_tag_counts_as_possible_wheat():

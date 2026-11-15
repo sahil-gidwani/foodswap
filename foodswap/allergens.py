@@ -3,7 +3,9 @@
 FAIL     any source in the record mentions it: the allergen list, the "may contain" list,
          an ingredient that carries it in the ingredient taxonomy, or the ingredient text.
 PASS     nothing mentions it, and the record has an English ingredient list that is mostly recognized.
-UNKNOWN  nothing mentions it, but the record doesn't have enough information to be sure.
+UNKNOWN  nothing mentions it, but the record doesn't have enough information to be sure, or the
+         product's name mentions it while its ingredient list doesn't (usually a list cut off
+         part-way, like Reese's cups listed as just "milk chocolate [sugar").
 
 PASS means "not declared in this record", never "safe".
 """
@@ -184,33 +186,46 @@ def ingredients_problem(product):
     return None
 
 
+def mentions(text, allergen):
+    """The allergen's words found in a piece of text, after free-from claims and exceptions are removed."""
+    if not isinstance(text, str):
+        return []
+    words, exceptions = PATTERNS[allergen]
+    text = FREE_FROM.sub(" freefrom ", text.lower())
+    if exceptions:
+        text = exceptions.sub(" ", text)
+    found = [m.group(0) for m in words.finditer(text)]
+    if ALLERGENS[allergen].get("plain_flour"):
+        found += ["flour" for _ in PLAIN_FLOUR.finditer(text)]
+    return found
+
+
 def check(product, allergen, carried):
     """The verdict for one product and allergen, with every piece of evidence as (source, detail)."""
     spec = ALLERGENS[allergen]
     evidence = [("allergen list", t) for t in product["allergen_tags"] if t in spec["tags"]]
     evidence += [("may contain", t) for t in product["trace_tags"] if t in spec["tags"]]
     evidence += [("ingredient", t) for t in product["ingredient_tags"] if allergen in carried.get(t, ())]
-
-    text = product["ingredients_text"]
-    if isinstance(text, str):
-        words, exceptions = PATTERNS[allergen]
-        text = FREE_FROM.sub(" freefrom ", text.lower())
-        if exceptions:
-            text = exceptions.sub(" ", text)
-        evidence += [("ingredient text", m.group(0)) for m in words.finditer(text)]
-        if spec.get("plain_flour"):
-            evidence += [("ingredient text", "flour") for _ in PLAIN_FLOUR.finditer(text)]
-
+    evidence += [("ingredient text", word) for word in mentions(product["ingredients_text"], allergen)]
     if evidence:
         return Verdict.FAIL, evidence
+
     problem = ingredients_problem(product)
-    return (Verdict.UNKNOWN, [("missing", problem)]) if problem else (Verdict.PASS, [])
+    if problem:
+        return Verdict.UNKNOWN, [("missing", problem)]
+    named = mentions(product["name"], allergen)
+    if named:
+        return Verdict.UNKNOWN, [("name", word) for word in named]
+    return Verdict.PASS, []
 
 
 def add_verdicts(df, ingredients):
-    """Add allergen_<name> (0 FAIL, 1 PASS, 2 UNKNOWN) and allergen_<name>_sources for every allergen."""
+    """Add allergen_<name> (0 FAIL, 1 PASS, 2 UNKNOWN) and allergen_<name>_sources for every allergen.
+
+    The sources column names the evidence a FAIL rests on, or "name" for an UNKNOWN caused by the name.
+    """
     carried = ingredient_allergens(ingredients)
-    fields = ["allergen_tags", "trace_tags", "ingredient_tags", "ingredients_text", "ingredients_n",
+    fields = ["name", "allergen_tags", "trace_tags", "ingredient_tags", "ingredients_text", "ingredients_n",
               "unknown_ingredients_n"]
     products = [dict(zip(fields, values)) for values in zip(*(df[f] for f in fields))]
 
@@ -219,8 +234,8 @@ def add_verdicts(df, ingredients):
         results = [check(p, allergen, carried) for p in products]
         df[f"allergen_{allergen}"] = pd.array([int(v) for v, _ in results], dtype="int8")
         df[f"allergen_{allergen}_sources"] = [
-            "+".join(sorted({source for source, _ in evidence})) if v == Verdict.FAIL else ""
-            for v, evidence in results
+            "+".join(sorted({source for source, _ in evidence if source != "missing"}))
+            for _, evidence in results
         ]
     return ["ingredients_check"] + [
         column for a in ALLERGENS for column in (f"allergen_{a}", f"allergen_{a}_sources")
