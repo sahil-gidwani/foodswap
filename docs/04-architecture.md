@@ -62,12 +62,12 @@ foodswap/            the code, one module per stage
   schema.py          types shared by the parser, the constraint checks and the ranker
   data.py            download and check the dump; build the corpus
   allergens.py       FAIL / PASS / UNKNOWN for every product and allergen, with the evidence
-                     added as each stage is written: parser.py, search.py, systems.py,
-                     evaluate.py
+  search.py          keyword (BM25) and meaning-based (embedding) search, merged by rank
+                     added as each stage is written: parser.py, systems.py, evaluate.py
 app.py               Streamlit search page
 pages/               Streamlit compare and labeling pages
 eval/                scenarios, rubric and labels (tracked in git)
-tests/               pytest: allergen rules now, parser rules next
+tests/               pytest: allergen rules and search logic now, parser rules next
 data/                downloads, corpus, indexes and runs (git-ignored)
 docs/                plan, design and the original proposal (proposal.pdf)
 ```
@@ -200,7 +200,9 @@ Libraries were checked on PyPI on 2026-11-09; see [12-methods-survey.md](12-meth
 
 ```
 python -m foodswap.data download     # now: dump + taxonomies + completeness check
-python -m foodswap.data build        # now: the corpus and an 18K-product sample, about 15 seconds
+python -m foodswap.data build        # the corpus and an 18K-product sample, with allergen verdicts (~1 minute)
+python -m foodswap.search build      # search indexes (~18 minutes; --sample: ~1 minute)
+python -m foodswap.search query "crunchy oat cereal" --exclude peanuts
 streamlit run app.py                 # later: the app
 ```
 

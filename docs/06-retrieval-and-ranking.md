@@ -1,8 +1,8 @@
 # 06 · Retrieval and ranking
 
-**Use:** design.
+**Use:** design. Sections 2–5 (indexing, keyword and meaning-based search, fusion) are implemented in `foodswap/search.py`; scoring (section 6) and diversity (section 7) are next.
 **Read by:** RANK role (owner); everyone for the scoring formula in section 6.
-**Last updated:** 2026-11-10.
+**Last updated:** 2026-11-14.
 
 This document specifies how candidates are found and ordered once a request is parsed ([05](05-query-understanding.md)) and the eligibility mask is built ([07](07-constraints-and-safety.md)). The alternatives considered for each stage are in [12-methods-survey.md](12-methods-survey.md).
 
@@ -27,8 +27,8 @@ Each product is indexed three times for BM25 and once for dense retrieval.
 |---|---|---|
 | `name` field | product name + generic name + brand | The strongest signal of what the product is |
 | `categories` field | English names of every canonical category on the product | OFF category tags already include ancestors; IDF down-weights generic ones such as "plant-based foods" |
-| `ingredients` field | English ingredient text | Long and noisy; low weight |
-| Dense text | `{name}. {brand}. {deepest category name}. Ingredients: {first ~40 words}` | Kept short; `bge-small-en-v1.5` reads at most 512 tokens and products rarely need more |
+| `ingredients` field | English ingredient text, with HTML markup such as `<span class="allergen">` removed | Long and noisy; low weight |
+| Dense text | `{name}. {brand}. {deepest category name}. Ingredients: {first ~40 words}` | Kept short: a median of 74 tokens and at most 226 on a 1,000-product check, well under the model's 512-token limit |
 
 Labels ("gluten-free", "organic") are not indexed in Core: constraints come from evidence, never from words that happen to match.
 
@@ -54,7 +54,7 @@ Field weights start at `name 1.0, categories 0.5, ingredients 0.3`. They are tun
 - Documents are embedded without a prefix; queries get the instruction "Represent this sentence for searching relevant passages: ".
 - Vectors are L2-normalized, stored as float16 on disk and float32 in memory, so cosine similarity is a dot product.
 - Search is exact: one matrix-vector product over the corpus, then the mask.
-- Throughput must be measured on 10K products before the full run. Plan the full embedding run overnight in case it is slow.
+- Measured throughput on the M4 laptop's GPU: about 400 products a second at batch size 64 in a short benchmark; the full corpus took 18 minutes (about 330 a second), and the 18K sample about a minute. Larger batches and shorter token limits were no faster.
 
 The model card notes that BGE similarity scores are skewed toward high values, so only the order of scores is meaningful. That is one more reason to fuse by rank (RRF) by default and to min-max normalize before any weighted combination.
 
@@ -69,6 +69,7 @@ RRF(d) = Σ_c  1 / (k + rank_c(d))          c ∈ {lexical, dense},  k = 60
 ```
 
 - Ranks are computed among eligible documents only.
+- Each method contributes its top 1,000 eligible products; a product outside a method's top 1,000 gets nothing from it.
 - A document with a zero BM25 score gets no lexical contribution.
 - k = 60 is the value from the original paper. Defaults differ between engines (OpenSearch uses 60, Qdrant uses 2), so the report states it.
 
@@ -79,6 +80,15 @@ CC(d) = λ · minmax(BM25_fielded(d)) + (1 − λ) · minmax(cos(d))
 ```
 
 λ is tuned on dev. Bruch, Gai and Ingber (ACM TOIS) found that a tuned convex combination beats RRF in and out of domain, that RRF is sensitive to k, and that only a few labelled queries are needed to tune λ. Our dev set is small, so this is a real test of that claim at small scale.
+
+**First checks on the 18K sample** (2026-11-14). Each method covers the other's blind spots:
+
+| Query | Keyword search alone | Meaning-based search alone | Combined |
+|---|---|---|---|
+| "fizzy drink" | Bottled water: only "drink" matched | Sodas and sparkling drinks | Sodas and sparkling drinks |
+| "peanut butter cereal" | Peanut butter jars and peanut butter cups | Peanut butter granola | Peanut butter cereals (Kashi, Kroger) on top |
+
+"Peanut butter cereal" with peanuts excluded also exposed cut-off ingredient lists passing the peanut check, which led to the name rule in [07](07-constraints-and-safety.md#31-allergen-and-ingredient-exclusions). A query over the sample takes about 0.15 seconds.
 
 ## 6. Scoring
 

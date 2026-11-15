@@ -124,9 +124,9 @@ It has about one day of float, and the human labeling sits on it. Parser tests, 
 | T3.2 | Evidence builder and golden tests | 7 | QUX | T2.2, T2.4, T3.1 | Nutella fails milk and soy; missing ingredients give UNKNOWN; every verdict names its source; all exception tests pass **Done Nov 14** (11 allergens, 36 tests). |
 | T3.3 | Nutrient features and within-category percentiles | 2 | DATA | T2.4 | Percentiles available per category and basis |
 | T4.1 | Rule parser, query formulation, clarifications, 30-case suite | 6 | QUX | T1.1 | No negated term ever reaches the formulated query |
-| T5.1 | Fielded BM25 (three `bm25s` indexes) | 4 | RANK | T2.2 | Index build and `score_all` on the sample; memory-mapped load |
-| T5.2 | Dense index and exact masked search | 4 | RANK | T2.2 | Throughput measured on 10K before the full run |
-| T5.3 | RRF, pipeline, systems, run and trace writer | 7 | RANK | T3.2, T4.1, T5.1, T5.2 | One command writes run, trace and settings for any system; ablations are settings, not code branches |
+| T5.1 | Fielded BM25 (three `bm25s` indexes) | 4 | RANK | T2.2 | Index build and `score_all` on the sample; memory-mapped load **Done Nov 14.** |
+| T5.2 | Dense index and exact masked search | 4 | RANK | T2.2 | Throughput measured on 10K before the full run **Done Nov 14** (about 400 products a second on the M4). |
+| T5.3 | RRF, pipeline, systems, run and trace writer | 7 | RANK | T3.2, T4.1, T5.1, T5.2 | One command writes run, trace and settings for any system; ablations are settings, not code branches **RRF done Nov 14**; pipeline and run writer next. |
 | T5.4 | Score S, dev grid tuner, family collapse, MMR | 5.5 | RANK | T5.3, T6.4 | Tuned weights recorded with the dev table |
 | T5.5 | Explanations and why-not list | 3 | QUX | T5.3 | Faithfulness test passes on 1,000 random pairs |
 | T5.6 | Two config-only baselines (X1, X2) | 3 | RANK 1.5; DATA, EVAL 0.75 each (labeling) | T5.3 | Presets only, no new code paths; first to be demoted to automatic metrics if labeling runs short |
