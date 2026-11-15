@@ -4,6 +4,8 @@ FoodSwap finds substitutes for a packaged food. A user picks a reference product
 
 It is a four-person Information Storage and Retrieval project built on [Open Food Facts](https://world.openfoodfacts.org). The original proposal is [proposal.pdf](proposal.pdf). These documents turn that proposal into a plan.
 
+**New to the project?** Start with [explainers/01-data-and-code.md](explainers/01-data-and-code.md): the data, the taxonomies and the code so far, with real examples.
+
 **Status (2026-11-10):** planning complete. Every decision in [decisions.md](decisions.md) is *Proposed* until the team confirms it at kickoff. Start with [10-plan.md §3.4, "First 48 hours"](10-plan.md#34-first-48-hours).
 
 ## At a glance
