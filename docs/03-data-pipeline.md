@@ -77,7 +77,7 @@ Other files in `data/corpus/`:
 
 - `sample.parquet`: the same columns for 18,293 products (section 3).
 - `build.json`: the funnel (section 4), counts, and the SHA-256 of the dump it came from.
-- Added by later steps: `evidence.parquet` ([07](07-constraints-and-safety.md#4-storage)) and the nutrient percentiles (section 5.3).
+- The allergen verdicts are columns of the same table: `ingredients_check`, `allergen_<name>` and `allergen_<name>_sources` ([07](07-constraints-and-safety.md#4-storage-and-results)). The nutrient percentiles (section 5.3) come later.
 
 ## 3. Extraction
 
@@ -168,7 +168,7 @@ For each nutrient and each category with enough products, store the empirical di
 ```
 data/                  (git-ignored)
   raw/                 food.parquet, taxonomies/*.json, REVISION, MANIFEST.json   (never edited)
-  corpus/              products.parquet, sample.parquet, build.json; later evidence.parquet
+  corpus/              products.parquet (with allergen verdicts), sample.parquet, build.json
   index/               BM25 and dense indexes (later)
   runs/                one folder per system run (later)
 eval/                  scenarios/, b3_cache/, pools/, labels/, qrels/                (tracked)

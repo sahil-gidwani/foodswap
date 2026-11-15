@@ -12,14 +12,12 @@ FoodSwap has an offline half that turns the Open Food Facts dump into a corpus a
 
 ```mermaid
 flowchart LR
-  A["OFF food.parquet<br/>4.9M products"] --> B["Pass 1<br/>US subset"]
-  B --> C["Pass 2<br/>canonical schema"]
+  A["OFF food.parquet<br/>4.9M products"] --> C["Flatten US products<br/>(one DuckDB query)"]
   T["OFF taxonomies<br/>categories, ingredients,<br/>allergens, labels"] --> C
-  C --> D["Quality gates<br/>and product families"]
-  D --> E[("products.parquet")]
-  E --> F["Evidence builder"]
-  T --> F
-  F --> G[("evidence.parquet")]
+  C --> D["Quality checks, families,<br/>comparison categories"]
+  T --> F["Allergen check<br/>FAIL / PASS / UNKNOWN"]
+  D --> F
+  F --> E[("products.parquet<br/>with verdict columns")]
   E --> H["Three BM25 indexes<br/>name, categories, ingredients"]
   E --> I["Embeddings<br/>bge-small, 384-d"]
   E --> J["Nutrient percentiles<br/>by category"]
@@ -63,12 +61,13 @@ requirements.txt     pinned versions, same on every laptop
 foodswap/            the code, one module per stage
   schema.py          types shared by the parser, the constraint checks and the ranker
   data.py            download and check the dump; build the corpus
-                     added as each stage is written: parser.py, evidence.py, search.py,
-                     systems.py, evaluate.py
+  allergens.py       FAIL / PASS / UNKNOWN for every product and allergen, with the evidence
+                     added as each stage is written: parser.py, search.py, systems.py,
+                     evaluate.py
 app.py               Streamlit search page
 pages/               Streamlit compare and labeling pages
 eval/                scenarios, rubric and labels (tracked in git)
-tests/               added with the first logic worth testing (parser, evidence rules)
+tests/               pytest: allergen rules now, parser rules next
 data/                downloads, corpus, indexes and runs (git-ignored)
 docs/                plan, design and the original proposal (proposal.pdf)
 ```

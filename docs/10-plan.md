@@ -120,8 +120,8 @@ It has about one day of float, and the human labeling sits on it. Parser tests, 
 | T2.4 | Taxonomy module, ancestor closure, comparison category, category postings | 4 | DATA | T2.1 | Comparison category computed for every searchable product. **Comparison category done Nov 14**; ancestor closure for ingredients comes with the evidence step. |
 | T2.5 | Product families by exact key | 2 | DATA | T2.2 | The two Cheerios barcodes share a family; a reference's family is never returned. **Families done Nov 14.** |
 | T2.6 | Missingness and coverage audit | 2 | DATA | T2.3 | `reports/data_audit.md` and the funnel figure come from a script |
-| T3.1 | Constraint vocabulary | 2 | EVAL | – | The vocabulary covers the 11 items in [07](07-constraints-and-safety.md#2-vocabulary), with exceptions |
-| T3.2 | Evidence builder and golden tests | 7 | QUX | T2.2, T2.4, T3.1 | Nutella fails milk and soy; missing ingredients give UNKNOWN; every verdict names its source; all exception tests pass |
+| T3.1 | Constraint vocabulary | 2 | EVAL | – | The vocabulary covers the 11 items in [07](07-constraints-and-safety.md#2-vocabulary), with exceptions **Done Nov 14.** |
+| T3.2 | Evidence builder and golden tests | 7 | QUX | T2.2, T2.4, T3.1 | Nutella fails milk and soy; missing ingredients give UNKNOWN; every verdict names its source; all exception tests pass **Done Nov 14** (11 allergens, 36 tests). |
 | T3.3 | Nutrient features and within-category percentiles | 2 | DATA | T2.4 | Percentiles available per category and basis |
 | T4.1 | Rule parser, query formulation, clarifications, 30-case suite | 6 | QUX | T1.1 | No negated term ever reaches the formulated query |
 | T5.1 | Fielded BM25 (three `bm25s` indexes) | 4 | RANK | T2.2 | Index build and `score_all` on the sample; memory-mapped load |

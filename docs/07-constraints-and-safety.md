@@ -2,7 +2,7 @@
 
 **Use:** design. This is the safety-critical part of the system; changes need a second reviewer and an entry in [decisions.md](decisions.md).
 **Read by:** QUX role (owner of the evidence builder); EVAL (owner of the vocabulary, T3.1); everyone for sections 8–9.
-**Last updated:** 2026-11-10.
+**Last updated:** 2026-11-14. The allergen check is implemented in `foodswap/allergens.py` and runs inside `python -m foodswap.data build`; tests are in `tests/test_allergens.py`.
 
 ## 1. Principle
 
@@ -20,47 +20,56 @@ Why three values: the alternative, treating missing evidence as a pass, is the f
 
 ## 2. Vocabulary
 
-The vocabulary (task T3.1, a Python dict next to the evidence code) maps what users say to what the data contains. Core covers the nine US major food allergens ([FDA](https://www.fda.gov/food/nutrition-food-labeling-and-critical-foods/food-allergies)) plus gluten, and molluscs (reached only through "shellfish").
+The vocabulary (`ALLERGENS` in `foodswap/allergens.py`) maps each allergen to what the data contains. It covers the nine US major food allergens ([FDA](https://www.fda.gov/food/nutrition-food-labeling-and-critical-foods/food-allergies)) plus gluten, and molluscs (reached only through "shellfish").
 
-| Id | User words | OFF allergen tag | Ingredient taxonomy evidence | Text lexicon (examples) | Exceptions (must not match) |
-|---|---|---|---|---|---|
-| `milk` | milk, dairy, lactose, casein, whey | `en:milk` | ingredients whose `allergens` property is `en:milk` | milk, cream, butter, cheese, whey, casein, caseinate, lactose, yogurt, yoghurt, ghee, curd, buttermilk | coconut milk, almond milk, oat milk, soy milk, rice milk, cocoa butter, peanut butter, nut butter, apple butter, butternut, cream of tartar |
-| `eggs` | egg, eggs | `en:eggs` | `allergens` = `en:eggs` | egg, albumen, albumin, ovalbumin, mayonnaise, meringue | eggplant |
-| `fish` | fish | `en:fish` | `allergens` = `en:fish` | anchovy, cod, salmon, tuna, tilapia, pollock, sardine, fish sauce | shellfish |
-| `crustaceans` | crustaceans, crustacean shellfish, shellfish | `en:crustaceans` | `allergens` = `en:crustaceans` | shrimp, prawn, crab, lobster, crayfish, krill | |
-| `molluscs` | molluscs, mollusks, shellfish | `en:molluscs` | `allergens` = `en:molluscs` | clam, mussel, oyster, scallop, squid, octopus | |
-| `tree_nuts` | tree nuts, nuts | `en:nuts` | `allergens` = `en:nuts` | almond, cashew, hazelnut, filbert, walnut, pecan, pistachio, macadamia, brazil nut, praline, marzipan | nutmeg, butternut, water chestnut, doughnut, donut |
-| `peanuts` | peanut, peanuts, groundnut | `en:peanuts` | `allergens` = `en:peanuts` | peanut, groundnut, arachis | |
-| `wheat` | wheat | none (OFF has no wheat node) | ingredients at or below `en:wheat` in the ingredient taxonomy; an `en:gluten` allergen or trace tag also counts (see note) | wheat, spelt, durum, semolina, farina, kamut, einkorn, emmer, bulgur, couscous, seitan | buckwheat |
-| `gluten` | gluten | `en:gluten` | `allergens` = `en:gluten` | the wheat terms plus barley, rye, malt, triticale | buckwheat |
-| `soybeans` | soy, soya, soybean | `en:soybeans` | `allergens` = `en:soybeans` | soy, soya, soybean, edamame, tofu, tempeh, miso | |
-| `sesame` | sesame | `en:sesame-seeds` | `allergens` = `en:sesame-seeds` | sesame, tahini, benne | |
+| Id | OFF allergen tag | Ingredient taxonomy evidence | Text words (a `*` also matches longer words) | Exceptions (must not match) |
+|---|---|---|---|---|
+| `milk` | `en:milk` | ingredients inheriting `allergens: en:milk` (whey, casein, milk powder, …) | milk\*, cream, butter, buttermilk, butterfat, butteroil, cheese, whey, casein, caseinate, lactose, lactalbumin, lactoglobulin, yogurt, ghee, curd, paneer | plant milks and creams (coconut, almond, oat, soy, rice, cashew, hemp, pea, flax, hazelnut, macadamia); plant, nut and seed butters (cocoa, cacao, shea, mango, coconut, peanut, almond, cashew, hazelnut, sunflower, soy, sesame, …); cream of tartar; bean curd |
+| `eggs` | `en:eggs` | `allergens: en:eggs` | egg, albumen, albumin, ovalbumin, lysozyme, mayonnaise, meringue | (eggplant never matches "egg") |
+| `fish` | `en:fish` | `allergens: en:fish` | fish, anchovy, cod, salmon, tuna, tilapia, pollock, sardine, haddock, trout, mackerel, herring, catfish, halibut, whitefish, lumpfish, monkfish, swordfish, bonito, hake, flounder, roe, caviar | (shellfish never matches "fish") |
+| `crustaceans` | `en:crustaceans` | `allergens: en:crustaceans` | shrimp, prawn, crab, lobster, crayfish, crawfish, krill | |
+| `molluscs` | `en:molluscs` | `allergens: en:molluscs` | clam, mussel, oyster, scallop, squid, octopus, calamari, snail, escargot, abalone | oyster mushroom |
+| `tree_nuts` | `en:nuts` | `allergens: en:nuts` | nut, almond\*, cashew\*, hazelnut\*, filbert, walnut\*, pecan\*, pistachio\*, macadamia\*, chestnut, praline, marzipan | water chestnut, soy nut, corn nut, hemp nut, sunflower nut, tiger nut |
+| `peanuts` | `en:peanuts` | `allergens: en:peanuts` | peanut\*, groundnut, ground nut, arachis | |
+| `wheat` | `en:gluten` (possible wheat) | ingredients at or below `en:wheat` | wheat\*, spelt, durum, semolina, farina, kamut, einkorn, emmer, farro, bulgur, couscous, seitan, graham, triticale, **plain flour** (below) | (buckwheat never matches "wheat") |
+| `gluten` | `en:gluten` | `allergens: en:gluten` (wheat, barley, rye, …) | gluten, the wheat words, barley, rye, malt, **plain flour** | (maltodextrin and maltose never match "malt") |
+| `soybeans` | `en:soybeans` | `allergens: en:soybeans` | soy\*, edamame, tofu, tempeh, miso | |
+| `sesame` | `en:sesame-seeds` | `allergens: en:sesame-seeds` | sesame\*, tahini, benne | |
+
+How the text is searched:
+
+- **Whole words, plurals included.** "egg" matches "eggs" but not "eggplant"; "fish" doesn't match "shellfish"; "nut" doesn't match "coconut", "nutmeg" or "doughnut".
+- **Prefix words.** A trailing `*` also matches longer words, because many records run words together: "soybeanoil", "soylecithin", "milkpowder", "peanutbutter", "pistachionut", "sesameoil".
+- **Exceptions** are removed from the text before the words are searched.
+- **Free-from claims** ("gluten-free", "peanut free facility") are replaced by a placeholder before searching. A claim of absence is not an ingredient, and the placeholder stops "gluten free flour" from turning into plain "flour".
+- **Plain flour is wheat.** On US labels, flour with no grain named is wheat flour. So "flour" listed on its own as an ingredient ("flour, sugar, …", "…: flour (…)"), and phrases such as "enriched flour", "bleached flour" and "all purpose flour", count as wheat and gluten. "Rice flour", "mustard flour" and "gluten free flour blend" don't. Open Food Facts files plain "flour" as a generic ingredient, not under wheat, so this rule has to live in the text search.
 
 Notes:
 
-- **Wheat.** A product tagged `en:gluten` may get its gluten from barley or rye rather than wheat. Core treats a gluten tag as possible wheat (FAIL with the detail "gluten declared; grain not identified"). This is conservative, and the audit counts how often it happens.
-- **"Nuts"** expands to `peanuts` and `tree_nuts`; **"shellfish"** to `crustaceans` and `molluscs` ([05](05-query-understanding.md#25-ambiguity-rules)). Molluscs are not a US major allergen; the UI says so.
-- Exception phrases are removed from the ingredient text before the lexicon runs, and every exception has a test.
+- **Wheat.** A product tagged `en:gluten` may get its gluten from barley or rye rather than wheat. A gluten tag therefore counts as possible wheat. This is conservative; through the taxonomy, barley carries gluten but not wheat.
+- **"Nuts"** expands to `peanuts` and `tree_nuts`, and **"shellfish"** to `crustaceans` and `molluscs` ([05](05-query-understanding.md#25-ambiguity-rules)). Molluscs are not a US major allergen; the UI says so.
+- **Pine nut, shea nut and kola nut** count as tree nuts, because the FDA's tree-nut list has included them. Coconut does not: Open Food Facts files it under fruit.
 - The other EU allergens (celery, mustard, lupin, sulphites) are Stretch (F-C13): one vocabulary entry each.
 
 ## 3. Evidence sources and the verdict rule
 
 ### 3.1 Allergen and ingredient exclusions
 
-Each source sets one bit:
+Four sources can show an allergen. The names below are what the code records as evidence:
 
-| Bit | Source | Positive when |
-|---|---|---|
-| 0 | `allergen_tag` | `allergen_tags` contains the item's OFF tag |
-| 1 | `trace_tag` | `trace_tags` contains it ("may contain") |
-| 2 | `ingredient_taxonomy` | an entry in `ingredient_tags` carries the allergen in its `allergens` property, directly or inherited through the ingredient taxonomy |
-| 3 | `ingredient_text` | the English ingredient text matches the lexicon after exception phrases are removed |
-| 4 | `label` | a free-from label is present (for example `en:no-gluten`); supporting evidence only |
+| Source | Positive when |
+|---|---|
+| `allergen list` | `allergen_tags` contains the allergen's OFF tag |
+| `may contain` | `trace_tags` contains it |
+| `ingredient` | an entry in `ingredient_tags` carries the allergen, directly or inherited through the ingredient taxonomy. Only 76 ingredient nodes declare an allergen; 1,382 ingredients inherit one, for example whey → dairy → milk. |
+| `ingredient text` | the English ingredient text matches the words, after exceptions and free-from claims are removed |
+
+Free-from labels (`en:no-gluten` and similar) are not used as evidence. They never turn a positive source into a PASS, and they never stand in for a missing ingredient list.
 
 The rule, in order:
 
-1. **FAIL** if any of bits 0–3 is set. A "may contain" statement fails by default (the stricter reading; F-C12 adds an opt-in mode that accepts traces).
-2. **PASS** if bits 0–3 are all clear **and** the product has English ingredient text **and** OFF recognized at least a share θ of its ingredients:
+1. **FAIL** if any source is positive. A "may contain" statement fails by default (the stricter reading; F-C12 adds an opt-in mode that accepts traces).
+2. **PASS** if no source is positive **and** the product has English ingredient text **and** OFF recognized at least a share θ of its ingredients:
 
    ```
    recognized_share = (ingredients_n − unknown_ingredients_n) / ingredients_n   ≥   θ = 0.8
@@ -71,17 +80,15 @@ The rule, in order:
 | Reason code | Condition | Shown as |
 |---|---|---|
 | `no_ingredients` | no English ingredient text | "Cannot verify: no English ingredient list" |
-| `no_parsed_ingredients` | `ingredients_n` missing or 0 | "Cannot verify: ingredient list not parsed" |
+| `not_parsed` | `ingredients_n` missing or 0 | "Cannot verify: ingredient list not parsed" |
 | `low_recognition` | recognized share below θ | "Cannot verify: {k} of {n} ingredients not recognized" |
 
 Rules about conflicting sources:
 
-- A free-from label never turns a positive source into a PASS. A conflict between a label and a tag is flagged for the audit.
-- A free-from label alone, without an ingredient list, is not enough for PASS. The audit reports how many labelled products this rule rejects.
 - θ = 0.8 is a safety parameter, not a tuning knob. Its effect on coverage is reported as a sensitivity curve (S8), and the default changes only through a logged decision.
 - If a product's main language is not English, `ingredients_n` and `unknown_ingredients_n` describe OFF's parse of the main-language text, while our lexicon checks the English text. Both checks still have to pass.
 
-**Ingredient exclusions that are not allergens** ("no gelatin", "no palm oil") use the same rule with bits 2 and 3:
+**Ingredient exclusions that are not allergens** ("no gelatin", "no palm oil") use the same rule with the `ingredient` and `ingredient text` sources. They are checked at query time, since the list of possible ingredients is open:
 
 - Core matches the exact ingredient id and its English names.
 - Should (S7) also matches every descendant in the ingredient taxonomy, so "no palm oil" also catches "palm kernel oil" if the taxonomy places it below palm oil.
@@ -100,25 +107,37 @@ Limits apply per 100 g, or per 100 ml for products measured in ml. Numeric verdi
 
 Category is not a verdict. Products outside the comparison category ([03](03-data-pipeline.md#52-comparison-category)) are simply not candidates; the UI shows how many products the category holds.
 
-## 4. Storage
+## 4. Storage and results
 
-`data/corpus/evidence.parquet`, built offline by the evidence step (T3.2):
+The verdicts are columns of `data/corpus/products.parquet` (and the sample), added during the build:
 
-| Column | Type | Meaning |
-|---|---|---|
-| `idx` | int32 | Row index |
-| `has_en_ingredients` | bool | |
-| `recognized_share` | float32 | NaN when not computable |
-| `<item>_verdict` | int8 | 0 FAIL, 1 PASS, 2 UNKNOWN, one column per vocabulary item |
-| `<item>_sources` | uint8 | Bitmask from section 3.1 |
-| `<item>_reason` | uint8 | Reason code for UNKNOWN |
+| Column | Meaning |
+|---|---|
+| `ingredients_check` | `ok`, or why the ingredient list can't support a PASS: `no_ingredients`, `not_parsed`, `low_recognition` |
+| `allergen_<name>` | 0 FAIL, 1 PASS, 2 UNKNOWN, one column per allergen (`allergen_peanuts`, …) |
+| `allergen_<name>_sources` | for a FAIL, which sources fired, joined by `+` (e.g. `allergen list+ingredient+ingredient text`) |
 
-Human-readable details (for example 'ingredient "skimmed milk powder" maps to `en:milk`') are recomputed at display time, and only for the products on screen.
+The detailed evidence (which tag, which ingredient, which words) is recomputed by `allergens.check()` at display time, only for the products on screen.
 
-Ingredient exclusions outside the vocabulary are evaluated at query time:
+Results on the 2026-11-14 snapshot, 349,308 products:
 
-- **Tags:** an ingredient-id → products posting list built with the corpus.
-- **Text:** the BM25 ingredients index finds documents that contain the term, and the lexicon regex runs only on those.
+| Allergen | FAIL | PASS | UNKNOWN |
+|---|---|---|---|
+| milk | 102,537 | 154,646 | 92,125 (26%) |
+| eggs | 31,430 | 216,596 | 101,282 (29%) |
+| fish | 6,129 | 241,143 | 102,036 (29%) |
+| crustaceans | 2,985 | 243,463 | 102,860 (29%) |
+| molluscs | 1,055 | 244,804 | 103,449 (30%) |
+| tree_nuts | 25,823 | 223,524 | 99,961 (29%) |
+| peanuts | 16,286 | 231,283 | 101,739 (29%) |
+| wheat | 76,100 | 175,238 | 97,970 (28%) |
+| gluten | 77,150 | 174,440 | 97,718 (28%) |
+| soybeans | 88,715 | 163,931 | 96,662 (28%) |
+| sesame | 9,138 | 237,598 | 102,572 (29%) |
+
+Roughly 26–30% of products can't be verified for any given allergen. Mostly they have no English ingredient list, or Open Food Facts recognized less than 80% of the ingredients. That is the coverage cost of the conservative rule (section 6).
+
+Ingredient exclusions outside the vocabulary are evaluated at query time, from `ingredient_tags` and the ingredient text.
 
 ## 5. Numeric and claim language
 
@@ -151,44 +170,30 @@ The default policy is never relaxed silently.
 
 ## 7. Tests
 
-Golden tests (T3.2) run on frozen copies of records captured from the pinned snapshot, so they work whether or not a record is in the US corpus. Expected verdicts are filled in by hand when fixtures are captured and checked by a second person.
+`tests/test_allergens.py` (run with `python -m pytest`) uses a small hand-made taxonomy, so it needs no download. It checks:
 
-| Case | Record | Expected |
-|---|---|---|
-| Allergen tags under-report | Nutella `3017624010701` (allergen tag lists only nuts) | `milk` FAIL via ingredients ("skimmed milk powder"); `soybeans` FAIL via trace tag and ingredients; `tree_nuts` FAIL via allergen tag |
-| No English ingredients | Crownfield bran flakes `20621483` (Italian text) | Allergens without a positive tag → UNKNOWN (`no_ingredients`); `milk` and `peanuts` FAIL via tags |
-| Allergen tags over-report | Nature's Path granola `0058449770565` | `peanuts` FAIL via allergen tag although the ingredient list has none (conservative) |
-| Families | Cheerios `0016000275263`, `0016000170032` | Same family (T2.5) |
-| Vandalized record | Cheerios `0016000275287` | Outside the searchable set (T2.3); non-canonical tag `en:Corn` dropped |
+- inheritance through the taxonomy (whey → milk; wheat flour → wheat and gluten; barley → gluten only; oats → nothing);
+- that each source alone is enough to FAIL;
+- that a clean record passes;
+- that each kind of missing information gives UNKNOWN, never PASS, while positive evidence still gives FAIL;
+- that a gluten tag counts as possible wheat;
+- lookalikes that must not match: plant milks and butters, eggplant, coconut, nutmeg, doughnut, water chestnut, soy nuts, buckwheat, rice and mustard flour, "gluten free flour blend", maltodextrin, free-from claims, shellfish versus fish;
+- real mentions that must match: "milkpowder", "butterfat", "lactalbumin", "lysozyme", "whitefish roe", "pistachionut", "peanutbutter", "soybeanoil", "sesameoil", "flour, sugar", "enriched bleached flour", malt vinegar.
 
-Synthetic records cover every rule:
+Checks against real records, run on the 2026-11-14 snapshot:
 
-| Record | Expected |
+| Record | Result |
 |---|---|
-| Allergen tag only | FAIL |
-| Trace tag only | FAIL |
-| Ingredient tag whose taxonomy entry carries the allergen (e.g. whey → milk) | FAIL |
-| Text match only ("contains peanut flour") | FAIL |
-| No English text | UNKNOWN (`no_ingredients`) |
-| English text, recognized share 0.5 | UNKNOWN (`low_recognition`) |
-| Clean record, recognized share 1.0 | PASS |
-| Free-from label plus a positive tag | FAIL, conflict flagged |
-| Free-from label, no ingredient list | UNKNOWN |
-| Sugar 8.0 g, limit ≤ 8 g / 8.01 g / missing | PASS / FAIL / UNKNOWN |
-| "140 mg sodium" limit on a product with 0.15 g sodium | FAIL (unit conversion) |
+| Nutella `3017624010701` (allergen tags list only nuts) | milk FAIL (may contain + "skimmed milk powder"); soy FAIL (may contain + "lecithins (soya)"); tree nuts FAIL (allergen list + "hazelnuts") |
+| Cheerios `0016000170032` | PASS for peanuts, milk, gluten, wheat and tree nuts |
+| Magic Spoon "Peanut Butter" cereal | peanuts FAIL (allergen list, peanut flour, peanut oil, text); milk FAIL (casein, whey protein) |
 
-Lexicon exceptions, each a test:
+**How the word lists were tested.** We searched the ingredient text of every PASS product for allergen-like fragments, and every text-only FAIL for the words in front of the match. That surfaced:
 
-| Text | Must not match | Must match |
-|---|---|---|
-| "coconut milk", "almond milk", "oat milk" | milk | |
-| "cocoa butter" | milk | |
-| "peanut butter" | milk | peanuts |
-| "nutmeg", "water chestnut", "doughnut" | tree nuts | |
-| "butternut squash" | milk, tree nuts | |
-| "eggplant" | eggs | |
-| "buckwheat" | wheat, gluten | |
-| "cream of tartar" | milk | |
+- **misses:** "soymilk", "soybeanoil", "lysozyme", "whitefish roe", and plain "flour, sugar, …" passing wheat;
+- **false alarms:** almond, cashew and sunflower butter failing milk; soy nuts and corn nuts failing tree nuts.
+
+Each was fixed and has a test. Re-running the same searches finds none of them.
 
 Should (S2) adds a hand audit of about 100 (product, allergen) verdicts stratified by verdict, checked against the ingredient-panel photos on OFF. It reports the false-pass rate with a confidence interval. With zero false passes in 100, the one-sided 95% upper bound is still about 3%. Products with photos are not a random sample, which the report states.
 
